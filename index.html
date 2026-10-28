@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Music Demo — Racing (Test)</title>
+  <title>Game Music Demo — Racing (Audio Test)</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -14,14 +14,25 @@
       font-family: system-ui, sans-serif;
     }
     canvas { background: #16213e; border-radius: 12px; display: block; }
+    .controls {
+      margin-top: 20px;
+      display: flex; gap: 12px;
+    }
     button {
-      margin-top: 20px; padding: 12px 32px;
+      padding: 12px 32px;
       font-size: 1.1rem; font-weight: 600;
       color: #1a1a2e; background: #e94560;
       border: none; border-radius: 8px; cursor: pointer;
-      transition: transform 0.1s;
+      transition: transform 0.1s, background 0.15s;
     }
     button:active { transform: scale(0.96); }
+    button.playing { background: #4ecca3; }
+    #status {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      opacity: 0.7;
+      min-height: 1.2em;
+    }
   </style>
 </head>
 <body>
@@ -29,12 +40,20 @@
   <p style="margin:0 0 20px; opacity:0.7;">Click the button — a square should jump</p>
 
   <canvas id="c" width="320" height="240"></canvas>
-  <button id="btn">Jump!</button>
+
+  <div class="controls">
+    <button id="jumpBtn">Jump!</button>
+    <button id="audioBtn">Start</button>
+  </div>
+
+  <div id="status">Audio: stopped</div>
+
+  <audio id="music" src="rotor_rush.mp3" loop preload="auto"></audio>
 
   <script>
+    // ---------- Canvas + jump square (unchanged logic) ----------
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
-    const btn = document.getElementById('btn');
 
     let x = canvas.width / 2 - 15;
     let y = canvas.height - 60;
@@ -49,8 +68,6 @@
         onGround = false;
       }
     }
-
-    btn.addEventListener('click', jump);
 
     function update() {
       vy += GRAVITY;
@@ -76,8 +93,51 @@
       draw();
       requestAnimationFrame(loop);
     }
-
     loop();
+
+    // ---------- Audio ----------
+    const audio = document.getElementById('music');
+    const audioBtn = document.getElementById('audioBtn');
+    const status = document.getElementById('status');
+    const jumpBtn = document.getElementById('jumpBtn');
+
+    // Jump on button click AND on spacebar (extra tap to unlock audio-friendly)
+    jumpBtn.addEventListener('click', jump);
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); jump(); }
+    });
+
+    // Audio toggle
+    audioBtn.addEventListener('click', async () => {
+      try {
+        if (audio.paused) {
+          // Re-start from the loop point each time
+          audio.currentTime = 0;
+          await audio.play();
+          audioBtn.textContent = 'Stop';
+          audioBtn.classList.add('playing');
+          status.textContent = 'Audio: playing (looped)';
+        } else {
+          audio.pause();
+          audioBtn.textContent = 'Start';
+          audioBtn.classList.remove('playing');
+          status.textContent = 'Audio: stopped';
+        }
+      } catch (err) {
+        status.textContent = 'Audio error: ' + err.message;
+        console.error(err);
+      }
+    });
+
+    // Surface load errors so we can see if the MP3 is missing / wrong path
+    audio.addEventListener('error', () => {
+      const code = audio.error ? audio.error.code : '?';
+      status.textContent = 'Audio load error (code ' + code + ') — check rotor_rush.mp3 path';
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      status.textContent = 'Ready: ' + audio.duration.toFixed(2) + ' s';
+    });
   </script>
 </body>
 </html>
