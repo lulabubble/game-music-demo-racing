@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Music Demo — Racing (Audio Test)</title>
+  <title>Game Music Demo — Racing (4-Stem Mix)</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -27,28 +27,68 @@
     }
     button:active { transform: scale(0.96); }
     button.playing { background: #4ecca3; }
+    button:disabled { opacity: 0.5; cursor: default; }
     #status {
       margin-top: 14px;
       font-size: 0.9rem;
       opacity: 0.7;
       min-height: 1.2em;
+      text-align: center;
+      max-width: 360px;
+    }
+    /* 4-stem toggles panel (top-right corner) */
+    #stemPanel {
+      position: fixed; top: 16px; right: 16px;
+      display: flex; flex-direction: column; gap: 6px;
+      background: rgba(22,33,62,0.92);
+      padding: 12px; border-radius: 10px;
+      border: 1px solid #0f3460;
+      z-index: 10;
+    }
+    #stemPanel .title {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 1px; opacity: 0.55;
+      margin-bottom: 2px; text-align: center;
+    }
+    .stemBtn {
+      padding: 7px 16px; font-size: 0.85rem; font-weight: 600;
+      background: #1a1a2e; color: #666;
+      border: 2px solid #333; border-radius: 6px;
+      cursor: pointer; text-align: left;
+      transition: all 0.15s;
+      min-width: 130px;
+    }
+    .stemBtn.on {
+      background: #4ecca3; color: #1a1a2e;
+      border-color: #4ecca3;
+    }
+    .stemBtn:active { transform: scale(0.97); }
+    @media (max-height: 640px) {
+      #stemPanel { top: 8px; right: 8px; padding: 8px; gap: 4px; }
+      .stemBtn { padding: 5px 12px; font-size: 0.8rem; min-width: 110px; }
     }
   </style>
 </head>
 <body>
   <h1 style="margin:0 0 10px; font-size:1.4rem;">Game Music Demo — Racing</h1>
-  <p style="margin:0 0 20px; opacity:0.7;">Click the button — a square should jump</p>
+  <p style="margin:0 0 20px; opacity:0.7;">4-stem mix · toggle stems in the corner</p>
+
+  <div id="stemPanel">
+    <div class="title">Stems</div>
+    <button class="stemBtn on" data-stem="air">Air</button>
+    <button class="stemBtn on" data-stem="motion">Motion</button>
+    <button class="stemBtn on" data-stem="acceleration">Acceleration</button>
+    <button class="stemBtn on" data-stem="danger">Danger</button>
+  </div>
 
   <canvas id="c" width="320" height="240"></canvas>
 
   <div class="controls">
     <button id="jumpBtn">Jump!</button>
-    <button id="audioBtn">Start</button>
+    <button id="audioBtn" disabled>Loading…</button>
   </div>
 
-  <div id="status">Audio: stopped</div>
-
-  <audio id="music" src="rotor_rush.mp3" loop preload="auto"></audio>
+  <div id="status">Loading audio…</div>
 
   <script>
     // ---------- Canvas + jump square (unchanged logic) ----------
@@ -95,49 +135,160 @@
     }
     loop();
 
-    // ---------- Audio ----------
-    const audio = document.getElementById('music');
+    // ---------- Audio (Web Audio API, 4 stems, sample-accurate loop) ----------
+    const STEMS = ['air', 'motion', 'acceleration', 'danger'];
     const audioBtn = document.getElementById('audioBtn');
     const status = document.getElementById('status');
     const jumpBtn = document.getElementById('jumpBtn');
+    const stemButtons = document.querySelectorAll('.stemBtn');
 
-    // Jump on button click AND on spacebar (extra tap to unlock audio-friendly)
+    const stemOn = { air: true, motion: true, acceleration: true, danger: true };
+
+    let audioCtx = null;
+    let masterGain = null;
+    let buffers = {};
+    let sources = {};
+    let gains = {};
+    let isPlaying = false;
+    let isReady = false;
+    let manifest = null;
+    let loopEndSec = null;   // from manifest.loopSamples, to keep stems in sync
+
+    // Jump handlers
     jumpBtn.addEventListener('click', jump);
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); jump(); }
     });
 
-    // Audio toggle
+    // Stem toggle handlers
+    stemButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.stem;
+        stemOn[name] = !stemOn[name];
+        btn.classList.toggle('on', stemOn[name]);
+        applyStemGain(name);
+      });
+    });
+
+    function applyStemGain(name) {
+      if (!audioCtx || !gains[name]) return;
+      const t = audioCtx.currentTime;
+      const g = gains[name].gain;
+      const target = stemOn[name] ? 1.0 : 0.0;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(target, t + 0.06);
+    }
+
+    async function loadAll() {
+      try {
+        // 1) Manifest (optional, used for BPM display + loopSamples)
+        try {
+          const mres = await fetch('racing_manifest.json', { cache: 'no-cache' });
+          if (mres.ok) manifest = await mres.json();
+        } catch (e) {
+          console.warn('manifest not loaded:', e);
+        }
+
+        // 2) AudioContext (may start suspended; resumed on Start click)
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.7;
+        masterGain.connect(audioCtx.destination);
+
+        // 3) Load 4 stem loops in parallel
+        const results = await Promise.all(STEMS.map(async (name) => {
+          const res = await fetch(`racing_${name}_loop.opus`, { cache: 'no-cache' });
+          if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+          const ab = await res.arrayBuffer();
+          const buf = await audioCtx.decodeAudioData(ab);
+          return [name, buf];
+        }));
+
+        let minLen = Infinity, maxLen = 0;
+        for (const [name, buf] of results) {
+          buffers[name] = buf;
+          minLen = Math.min(minLen, buf.length);
+          maxLen = Math.max(maxLen, buf.length);
+          console.log(name, 'length', buf.length, 'samples',
+                      (buf.length / buf.sampleRate).toFixed(3) + ' s');
+        }
+        if (maxLen - minLen > 1) {
+          console.warn('Stem lengths differ by', maxLen - minLen,
+                       'samples — using manifest loopSamples to keep sync.');
+        }
+
+        // 4) Loop end: trust manifest if present, otherwise shortest buffer
+        const loopSamples = (manifest && manifest.loopSamples) ? manifest.loopSamples : minLen;
+        loopEndSec = loopSamples / audioCtx.sampleRate;
+
+        const bpm = (manifest && manifest.bpm) ? manifest.bpm : '?';
+        status.textContent =
+          `Ready: ${bpm} BPM, ${loopEndSec.toFixed(2)} s, ${STEMS.length} stems`;
+        isReady = true;
+        audioBtn.disabled = false;
+        audioBtn.textContent = 'Start';
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Audio load error: ' + err.message;
+        audioBtn.textContent = 'Error';
+      }
+    }
+
+    async function startPlayback() {
+      if (!isReady || isPlaying) return;
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+      // Shared start time for all stems — sample-accurate sync.
+      const startAt = audioCtx.currentTime + 0.08;
+
+      STEMS.forEach(name => {
+        const src = audioCtx.createBufferSource();
+        src.buffer = buffers[name];
+        src.loop = true;
+        src.loopStart = 0;
+        src.loopEnd = loopEndSec;   // same for all stems -> stays in sync
+        const g = audioCtx.createGain();
+        g.gain.value = stemOn[name] ? 1.0 : 0.0;
+        src.connect(g).connect(masterGain);
+        src.start(startAt);
+        sources[name] = src;
+        gains[name] = g;
+      });
+
+      isPlaying = true;
+      audioBtn.textContent = 'Stop';
+      audioBtn.classList.add('playing');
+      status.textContent = 'Playing (4-stem mix, looped)';
+    }
+
+    function stopPlayback() {
+      if (!isPlaying) return;
+      STEMS.forEach(name => {
+        try { sources[name].stop(); } catch (e) {}
+        try { sources[name].disconnect(); } catch (e) {}
+        try { gains[name].disconnect(); } catch (e) {}
+      });
+      sources = {};
+      gains = {};
+      isPlaying = false;
+      audioBtn.textContent = 'Start';
+      audioBtn.classList.remove('playing');
+      status.textContent = 'Stopped';
+    }
+
     audioBtn.addEventListener('click', async () => {
       try {
-        if (audio.paused) {
-          // Re-start from the loop point each time
-          audio.currentTime = 0;
-          await audio.play();
-          audioBtn.textContent = 'Stop';
-          audioBtn.classList.add('playing');
-          status.textContent = 'Audio: playing (looped)';
-        } else {
-          audio.pause();
-          audioBtn.textContent = 'Start';
-          audioBtn.classList.remove('playing');
-          status.textContent = 'Audio: stopped';
-        }
+        if (isPlaying) stopPlayback();
+        else await startPlayback();
       } catch (err) {
-        status.textContent = 'Audio error: ' + err.message;
         console.error(err);
+        status.textContent = 'Audio error: ' + err.message;
       }
     });
 
-    // Surface load errors so we can see if the MP3 is missing / wrong path
-    audio.addEventListener('error', () => {
-      const code = audio.error ? audio.error.code : '?';
-      status.textContent = 'Audio load error (code ' + code + ') — check rotor_rush.mp3 path';
-    });
-
-    audio.addEventListener('loadedmetadata', () => {
-      status.textContent = 'Ready: ' + audio.duration.toFixed(2) + ' s';
-    });
+    // Start loading as soon as the page opens
+    loadAll();
   </script>
 </body>
 </html>
