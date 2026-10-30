@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Music Demo — Racing (4-Stem Mix)</title>
+  <title>Game Music Demo — Racing (Sample-Accurate Loop)</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -14,54 +14,43 @@
       font-family: system-ui, sans-serif;
     }
     canvas { background: #16213e; border-radius: 12px; display: block; }
-    .controls {
-      margin-top: 20px;
-      display: flex; gap: 12px;
-    }
+    .controls { margin-top: 20px; display: flex; gap: 12px; }
     button {
-      padding: 12px 32px;
-      font-size: 1.1rem; font-weight: 600;
-      color: #1a1a2e; background: #e94560;
-      border: none; border-radius: 8px; cursor: pointer;
-      transition: transform 0.1s, background 0.15s;
+      padding: 12px 32px; font-size: 1.1rem; font-weight: 600;
+      color: #1a1a2e; background: #e94560; border: none; border-radius: 8px;
+      cursor: pointer; transition: transform 0.1s, background 0.15s;
     }
     button:active { transform: scale(0.96); }
     button.playing { background: #4ecca3; }
     button:disabled { opacity: 0.5; cursor: default; }
     #status {
-      margin-top: 14px;
-      font-size: 0.9rem;
-      opacity: 0.7;
-      min-height: 1.2em;
-      text-align: center;
-      max-width: 360px;
+      margin-top: 14px; font-size: 0.9rem; opacity: 0.7;
+      min-height: 1.2em; text-align: center; max-width: 360px;
     }
-    /* 4-stem toggles panel (top-right corner) */
+    #diag {
+      margin-top: 10px; font-size: 0.7rem; opacity: 0.5;
+      text-align: center; max-width: 360px;
+      font-family: monospace; line-height: 1.5;
+    }
     #stemPanel {
       position: fixed; top: 16px; right: 16px;
       display: flex; flex-direction: column; gap: 6px;
-      background: rgba(22,33,62,0.92);
-      padding: 12px; border-radius: 10px;
-      border: 1px solid #0f3460;
-      z-index: 10;
+      background: rgba(22,33,62,0.92); padding: 12px;
+      border-radius: 10px; border: 1px solid #0f3460; z-index: 10;
     }
     #stemPanel .title {
       font-size: 0.7rem; text-transform: uppercase;
-      letter-spacing: 1px; opacity: 0.55;
-      margin-bottom: 2px; text-align: center;
+      letter-spacing: 1px; opacity: 0.55; margin-bottom: 2px;
+      text-align: center;
     }
     .stemBtn {
       padding: 7px 16px; font-size: 0.85rem; font-weight: 600;
       background: #1a1a2e; color: #666;
       border: 2px solid #333; border-radius: 6px;
       cursor: pointer; text-align: left;
-      transition: all 0.15s;
-      min-width: 130px;
+      transition: all 0.15s; min-width: 130px;
     }
-    .stemBtn.on {
-      background: #4ecca3; color: #1a1a2e;
-      border-color: #4ecca3;
-    }
+    .stemBtn.on { background: #4ecca3; color: #1a1a2e; border-color: #4ecca3; }
     .stemBtn:active { transform: scale(0.97); }
     @media (max-height: 640px) {
       #stemPanel { top: 8px; right: 8px; padding: 8px; gap: 4px; }
@@ -71,7 +60,7 @@
 </head>
 <body>
   <h1 style="margin:0 0 10px; font-size:1.4rem;">Game Music Demo — Racing</h1>
-  <p style="margin:0 0 20px; opacity:0.7;">4-stem mix · toggle stems in the corner</p>
+  <p style="margin:0 0 20px; opacity:0.7;">4-stem mix · sample-accurate loop</p>
 
   <div id="stemPanel">
     <div class="title">Stems</div>
@@ -89,37 +78,23 @@
   </div>
 
   <div id="status">Loading audio…</div>
+  <div id="diag"></div>
 
   <script>
-    // ---------- Canvas + jump square (unchanged logic) ----------
+    // ---------- Canvas + jump square (unchanged) ----------
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
-
-    let x = canvas.width / 2 - 15;
-    let y = canvas.height - 60;
-    let vy = 0;
-    let onGround = true;
-    const GRAVITY = 0.6;
-    const JUMP_FORCE = -12;
-
-    function jump() {
-      if (onGround) {
-        vy = JUMP_FORCE;
-        onGround = false;
-      }
-    }
-
+    let x = canvas.width / 2 - 15, y = canvas.height - 60, vy = 0, onGround = true;
+    const GRAVITY = 0.6, JUMP_FORCE = -12;
+    function jump() { if (onGround) { vy = JUMP_FORCE; onGround = false; } }
     function update() {
-      vy += GRAVITY;
-      y += vy;
+      vy += GRAVITY; y += vy;
       const floor = canvas.height - 60;
       if (y >= floor) { y = floor; vy = 0; onGround = true; }
     }
-
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#0f3460';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#0f3460'; ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, canvas.height - 45);
       ctx.lineTo(canvas.width, canvas.height - 45);
@@ -127,40 +102,28 @@
       ctx.fillStyle = '#e94560';
       ctx.fillRect(x, y, 30, 30);
     }
+    (function loop() { update(); draw(); requestAnimationFrame(loop); })();
 
-    function loop() {
-      update();
-      draw();
-      requestAnimationFrame(loop);
-    }
-    loop();
-
-    // ---------- Audio (Web Audio API, 4 stems, sample-accurate loop) ----------
+    // ---------- Audio: sample-accurate loop from manifest ----------
     const STEMS = ['air', 'motion', 'acceleration', 'danger'];
     const audioBtn = document.getElementById('audioBtn');
-    const status = document.getElementById('status');
+    const statusEl = document.getElementById('status');
+    const diagEl = document.getElementById('diag');
     const jumpBtn = document.getElementById('jumpBtn');
     const stemButtons = document.querySelectorAll('.stemBtn');
 
     const stemOn = { air: true, motion: true, acceleration: true, danger: true };
 
-    let audioCtx = null;
-    let masterGain = null;
-    let buffers = {};
-    let sources = {};
-    let gains = {};
-    let isPlaying = false;
-    let isReady = false;
-    let manifest = null;
-    let loopEndSec = null;   // from manifest.loopSamples, to keep stems in sync
+    let audioCtx = null, masterGain = null;
+    let buffers = {}, sources = {}, gains = {};
+    let isPlaying = false, isReady = false, manifest = null;
+    let loopDurationSec = null;   // exact, derived from loopSamples
 
-    // Jump handlers
     jumpBtn.addEventListener('click', jump);
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); jump(); }
     });
 
-    // Stem toggle handlers
     stemButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const name = btn.dataset.stem;
@@ -180,57 +143,79 @@
       g.linearRampToValueAtTime(target, t + 0.06);
     }
 
+    // Build a clean AudioBuffer of exactly `targetLength` samples,
+    // copying from `decoded` (which may be longer due to Opus padding).
+    function makeCleanBuffer(decoded, targetLength) {
+      const clean = audioCtx.createBuffer(
+        decoded.numberOfChannels,
+        targetLength,
+        audioCtx.sampleRate
+      );
+      for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+        const src = decoded.getChannelData(ch);
+        const dst = clean.getChannelData(ch);
+        const n = Math.min(src.length, targetLength);
+        dst.set(src.subarray(0, n));
+        // remaining samples stay 0 (only happens if decoded is shorter than expected)
+      }
+      return clean;
+    }
+
     async function loadAll() {
       try {
-        // 1) Manifest (optional, used for BPM display + loopSamples)
+        // 1) Manifest (required for sample-accurate loop)
+        const mres = await fetch('racing_manifest.json', { cache: 'no-cache' });
+        if (!mres.ok) throw new Error('manifest HTTP ' + mres.status);
+        manifest = await mres.json();
+
+        // 2) AudioContext locked to source sample rate (no resampling)
+        const Ctx = window.AudioContext || window.webkitAudioContext;
         try {
-          const mres = await fetch('racing_manifest.json', { cache: 'no-cache' });
-          if (mres.ok) manifest = await mres.json();
+          audioCtx = new Ctx({ sampleRate: manifest.sampleRate });
         } catch (e) {
-          console.warn('manifest not loaded:', e);
+          // Older browsers may not accept options
+          audioCtx = new Ctx();
         }
 
-        // 2) AudioContext (may start suspended; resumed on Start click)
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = audioCtx.createGain();
         masterGain.gain.value = 0.7;
         masterGain.connect(audioCtx.destination);
 
-        // 3) Load 4 stem loops in parallel
-        const results = await Promise.all(STEMS.map(async (name) => {
+        // 3) Load + decode + clean all 4 stems in parallel
+        const expectedLen = Math.round(
+          manifest.loopSamples * audioCtx.sampleRate / manifest.sampleRate
+        );
+
+        const diagLines = [`ctx=${audioCtx.sampleRate}Hz  expected=${expectedLen}`];
+
+        await Promise.all(STEMS.map(async (name) => {
           const res = await fetch(`racing_${name}_loop.opus`, { cache: 'no-cache' });
           if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
           const ab = await res.arrayBuffer();
-          const buf = await audioCtx.decodeAudioData(ab);
-          return [name, buf];
+          const decoded = await audioCtx.decodeAudioData(ab);
+
+          const clean = makeCleanBuffer(decoded, expectedLen);
+          buffers[name] = clean;
+
+          const diff = decoded.length - expectedLen;
+          diagLines.push(
+            `${name}: dec=${decoded.length} d=${diff >= 0 ? '+' : ''}${diff}`
+          );
         }));
 
-        let minLen = Infinity, maxLen = 0;
-        for (const [name, buf] of results) {
-          buffers[name] = buf;
-          minLen = Math.min(minLen, buf.length);
-          maxLen = Math.max(maxLen, buf.length);
-          console.log(name, 'length', buf.length, 'samples',
-                      (buf.length / buf.sampleRate).toFixed(3) + ' s');
-        }
-        if (maxLen - minLen > 1) {
-          console.warn('Stem lengths differ by', maxLen - minLen,
-                       'samples — using manifest loopSamples to keep sync.');
-        }
+        loopDurationSec = expectedLen / audioCtx.sampleRate;
 
-        // 4) Loop end: trust manifest if present, otherwise shortest buffer
-        const loopSamples = (manifest && manifest.loopSamples) ? manifest.loopSamples : minLen;
-        loopEndSec = loopSamples / audioCtx.sampleRate;
+        diagEl.innerHTML = diagLines.join('<br>');
 
-        const bpm = (manifest && manifest.bpm) ? manifest.bpm : '?';
-        status.textContent =
-          `Ready: ${bpm} BPM, ${loopEndSec.toFixed(2)} s, ${STEMS.length} stems`;
+        const bpm = manifest.bpm ?? '?';
+        statusEl.textContent =
+          `Ready: ${bpm} BPM, ${loopDurationSec.toFixed(6)} s, ${STEMS.length} stems`;
         isReady = true;
         audioBtn.disabled = false;
         audioBtn.textContent = 'Start';
       } catch (err) {
         console.error(err);
-        status.textContent = 'Audio load error: ' + err.message;
+        statusEl.textContent = 'Audio load error: ' + err.message;
         audioBtn.textContent = 'Error';
       }
     }
@@ -239,7 +224,7 @@
       if (!isReady || isPlaying) return;
       if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-      // Shared start time for all stems — sample-accurate sync.
+      // One shared start time -> sample-accurate sync between stems.
       const startAt = audioCtx.currentTime + 0.08;
 
       STEMS.forEach(name => {
@@ -247,7 +232,7 @@
         src.buffer = buffers[name];
         src.loop = true;
         src.loopStart = 0;
-        src.loopEnd = loopEndSec;   // same for all stems -> stays in sync
+        src.loopEnd = loopDurationSec;   // exact length, no padding included
         const g = audioCtx.createGain();
         g.gain.value = stemOn[name] ? 1.0 : 0.0;
         src.connect(g).connect(masterGain);
@@ -259,7 +244,7 @@
       isPlaying = true;
       audioBtn.textContent = 'Stop';
       audioBtn.classList.add('playing');
-      status.textContent = 'Playing (4-stem mix, looped)';
+      statusEl.textContent = 'Playing (sample-accurate loop)';
     }
 
     function stopPlayback() {
@@ -269,12 +254,11 @@
         try { sources[name].disconnect(); } catch (e) {}
         try { gains[name].disconnect(); } catch (e) {}
       });
-      sources = {};
-      gains = {};
+      sources = {}; gains = {};
       isPlaying = false;
       audioBtn.textContent = 'Start';
       audioBtn.classList.remove('playing');
-      status.textContent = 'Stopped';
+      statusEl.textContent = 'Stopped';
     }
 
     audioBtn.addEventListener('click', async () => {
@@ -283,11 +267,10 @@
         else await startPlayback();
       } catch (err) {
         console.error(err);
-        status.textContent = 'Audio error: ' + err.message;
+        statusEl.textContent = 'Audio error: ' + err.message;
       }
     });
 
-    // Start loading as soon as the page opens
     loadAll();
   </script>
 </body>
