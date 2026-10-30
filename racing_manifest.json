@@ -1,0 +1,282 @@
+{
+  "track": "Rotor Rush",
+  "version": 9,
+  "bpm": 174.0,
+  "sampleRate": 44100,
+  "channels": 2,
+  "loopSamples": 1946483,
+  "loopSeconds": 44.137937,
+  "targetRmsDb": -18.0,
+  "targetPeak": 0.92,
+  "masterPeakLimit": 0.98,
+  "k": 0.73393224,
+  "preset": "production",
+  "masterDefinition": "sum of loop stems (for loop) or sum of stem_double stems (for double); no make_loop; no tanh; no normalization",
+  "contextMix": {
+    "description": "Full 4-stem mix (2N). Target stem x DOUBLE_CONTEXT_BOOST, each other stem x DOUBLE_CONTEXT_OTHERS, then renormalized to TARGET_RMS_DB per target. This is the racing_*_double.wav file, intended for Suno / audio-model ingestion so the model hears the full picture with the target stem dominant. The solo reference is racing_*_stem_double.wav.",
+    "targetStemBoost": 3.0,
+    "otherStemsScale": 0.33,
+    "ratioTargetOverOthers": 9.0909,
+    "renormalizedToDb": -18.0,
+    "perStem": {
+      "air": {
+        "targetStem": "air",
+        "targetStemBoost": 3.0,
+        "otherStemsScale": 0.33,
+        "k_ctx": 2.97789497,
+        "peakIn": 0.635475,
+        "peakOut": 0.635475,
+        "rmsDbOut": -18.0,
+        "softTanh_a": null
+      },
+      "motion": {
+        "targetStem": "motion",
+        "targetStemBoost": 3.0,
+        "otherStemsScale": 0.33,
+        "k_ctx": 0.51828637,
+        "peakIn": 0.684184,
+        "peakOut": 0.684184,
+        "rmsDbOut": -18.0,
+        "softTanh_a": null
+      },
+      "acceleration": {
+        "targetStem": "acceleration",
+        "targetStemBoost": 3.0,
+        "otherStemsScale": 0.33,
+        "k_ctx": 0.43815756,
+        "peakIn": 0.509173,
+        "peakOut": 0.509173,
+        "rmsDbOut": -18.0,
+        "softTanh_a": null
+      },
+      "danger": {
+        "targetStem": "danger",
+        "targetStemBoost": 3.0,
+        "otherStemsScale": 0.33,
+        "k_ctx": 1.72493494,
+        "peakIn": 1.981014,
+        "peakOut": 0.92,
+        "rmsDbOut": -18.772,
+        "softTanh_a": 0.94869434
+      }
+    }
+  },
+  "pipeline": [
+    "1. dry 2N buses (10)",
+    "2. reverb per bus (stereo buses per-channel)",
+    "3. weighted sum into 4 stems (2N)",
+    "4. single k on sum -> TARGET_RMS_DB",
+    "5. per-stem soft-tanh if peak > TARGET_PEAK",
+    "6. make_loop each stem -> 4 loop stems (N)",
+    "7. build 4 context doubles (2N): target x BOOST, others x OTHERS, renorm",
+    "8. master_double = sum(2N stem doubles); master_loop = sum(N loops); verify identity",
+    "9. write 4 stems x (_loop, _stem_double, _double) + master x (_loop, _double) + manifest"
+  ],
+  "knownFixes": {
+    "FIX-1": {
+      "name": "kick click artifact in motion stem",
+      "fix": "squared fade-out of 30 ms on kick envelope (KICK_FADE_OUT_SEC)",
+      "symptom": "sharp click after every kick in racing_motion_loop.wav solo",
+      "doNotRemove": "verify motion stem loop and stem_double clean before changing KICK_FADE_OUT_SEC"
+    },
+    "FIX-2": {
+      "name": "stereo reverb mono collapse",
+      "fix": "per-channel convolution for stereo inputs (no mono collapse)",
+      "symptom": "high frequencies missing in master, present in wind_exp solo",
+      "affects": "only wind_exp (only stereo bus)"
+    }
+  },
+  "earTunedValues": {
+    "wind_weight": 0.2,
+    "wind_exp_weight": 0.7,
+    "char_D_exponent": 1.5,
+    "wind_exp_smooth_scale": 0.05,
+    "note": "tuned by ear against racing_master_loop.wav and stem solos; do not change without re-listening"
+  },
+  "stems": [
+    "air",
+    "motion",
+    "acceleration",
+    "danger"
+  ],
+  "stemInfo": {
+    "air": {
+      "a": null,
+      "peak_in": 0.013347,
+      "peak_out": 0.013347,
+      "rms_in_db": -51.933,
+      "rms_out_db": -51.933
+    },
+    "motion": {
+      "a": null,
+      "peak_in": 0.422926,
+      "peak_out": 0.422926,
+      "rms_in_db": -21.902,
+      "rms_out_db": -21.902
+    },
+    "acceleration": {
+      "a": null,
+      "peak_in": 0.390508,
+      "peak_out": 0.390508,
+      "rms_in_db": -20.408,
+      "rms_out_db": -20.408
+    },
+    "danger": {
+      "a": null,
+      "peak_in": 0.405599,
+      "peak_out": 0.405599,
+      "rms_in_db": -33.921,
+      "rms_out_db": -33.921
+    }
+  },
+  "buses": {
+    "pad": {
+      "stem": "air",
+      "weight": 0.5,
+      "reverb": {
+        "ir_dur": 4.0,
+        "wet": 0.5,
+        "decay": 1.4,
+        "hp": 250,
+        "lp": 4000,
+        "seed": 1001,
+        "ch": "mono"
+      }
+    },
+    "wind": {
+      "stem": "air",
+      "weight": 0.2,
+      "reverb": {
+        "ir_dur": 2.0,
+        "wet": 0.25,
+        "decay": 2.0,
+        "hp": 400,
+        "lp": 3000,
+        "seed": 1002,
+        "ch": "mono"
+      }
+    },
+    "wind_exp": {
+      "stem": "danger",
+      "weight": 0.7,
+      "reverb": {
+        "ir_dur": 2.0,
+        "wet": 0.25,
+        "decay": 2.0,
+        "hp": 400,
+        "lp": 3000,
+        "seed": 1003,
+        "ch": "stereo"
+      }
+    },
+    "kick": {
+      "stem": "motion",
+      "weight": 0.85,
+      "reverb": {
+        "ir_dur": 0.15,
+        "wet": 0.04,
+        "decay": 4.0,
+        "hp": 300,
+        "lp": 2500,
+        "seed": 1004,
+        "ch": "mono"
+      }
+    },
+    "hat": {
+      "stem": "motion",
+      "weight": 0.45,
+      "reverb": {
+        "ir_dur": 0.25,
+        "wet": 0.12,
+        "decay": 3.0,
+        "hp": 1500,
+        "lp": 8000,
+        "seed": 1005,
+        "ch": "mono"
+      }
+    },
+    "snare": {
+      "stem": "danger",
+      "weight": 0.65,
+      "reverb": {
+        "ir_dur": 0.2,
+        "wet": 0.08,
+        "decay": 3.5,
+        "hp": 500,
+        "lp": 6000,
+        "seed": 1006,
+        "ch": "mono"
+      }
+    },
+    "fx": {
+      "stem": "danger",
+      "weight": 0.45,
+      "reverb": {
+        "ir_dur": 3.0,
+        "wet": 0.45,
+        "decay": 1.4,
+        "hp": 200,
+        "lp": 4000,
+        "seed": 1007,
+        "ch": "mono"
+      }
+    },
+    "reese": {
+      "stem": "acceleration",
+      "weight": 0.8,
+      "reverb": {
+        "ir_dur": 0.1,
+        "wet": 0.02,
+        "decay": 5.0,
+        "hp": 300,
+        "lp": 4000,
+        "seed": 1008,
+        "ch": "mono"
+      }
+    },
+    "sub": {
+      "stem": "acceleration",
+      "weight": 0.75,
+      "reverb": {
+        "ir_dur": 0.0,
+        "wet": 0.0,
+        "decay": 1.0,
+        "hp": 100,
+        "lp": 1000,
+        "seed": 1009,
+        "ch": "mono"
+      }
+    },
+    "arp": {
+      "stem": "acceleration",
+      "weight": 0.55,
+      "reverb": {
+        "ir_dur": 0.2,
+        "wet": 0.08,
+        "decay": 3.5,
+        "hp": 500,
+        "lp": 6000,
+        "seed": 1010,
+        "ch": "mono"
+      }
+    }
+  },
+  "master": {
+    "peakDouble": 0.622364,
+    "peakLoop": 0.622364,
+    "rmsDbDouble": -18.0,
+    "rmsDbLoop": -18.0,
+    "identityDoubleDiff": 2.98e-08,
+    "identityLoopDiff": 2.98e-08
+  },
+  "playerNotes": {
+    "loopFile": "Use racing_*_loop.wav for AudioBufferSourceNode.loop=true in the game.",
+    "stemDoubleFile": "Solo stem double (2N). Use for A/B comparison against the original solo loop and for regression testing of FIX-1/FIX-2. Not for Suno.",
+    "contextDoubleFile": "Full 4-stem context mix with target stem boosted. Use racing_*_double.wav for Suno / audio-model ingestion.",
+    "doNotMixMasterWithStems": true,
+    "masterIsReferenceOnly": "In-game, mix the 4 loop stems; master is a preview of the full unity mix.",
+    "stereoReverbFix": "wind_exp is stereo; its reverb is applied per-channel (no mono collapse). Other 9 buses are mono and use legacy path.",
+    "preset": "To experiment, add a new preset to PRESETS; do not edit production in place.",
+    "v8ToV9Migration": "In v8, racing_*_double.wav was the SOLO double. In v9 it is the CONTEXT mix. The solo double in v9 is racing_*_stem_double.wav. If you have v8 _double files in your output folder, delete them before running v9 to avoid confusion."
+  }
+}
