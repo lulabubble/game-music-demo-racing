@@ -3,85 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Music Demo — Racing (Sample-Accurate Loop)</title>
+  <title>Game Music Demo — Racing (Adaptive Mixer)</title>
   <style>
     * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100vh; overflow-x: hidden; }
     body {
-      margin: 0; height: 100vh; overflow: hidden;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
       background: #1a1a2e; color: #e0e0e0;
       font-family: system-ui, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 20px 16px;
     }
-    canvas { background: #16213e; border-radius: 12px; display: block; }
-    .controls { margin-top: 20px; display: flex; gap: 12px; }
+    canvas { background: #16213e; border-radius: 12px; display: block; margin-top: 8px; }
     button {
-      padding: 12px 32px; font-size: 1.1rem; font-weight: 600;
-      color: #1a1a2e; background: #e94560; border: none; border-radius: 8px;
-      cursor: pointer; transition: transform 0.1s, background 0.15s;
+      font-family: inherit; cursor: pointer;
+      transition: transform 0.1s, background 0.15s;
     }
     button:active { transform: scale(0.96); }
-    button.playing { background: #4ecca3; }
     button:disabled { opacity: 0.5; cursor: default; }
+
+    #mixer {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 10px; width: 100%; max-width: 340px;
+      margin-top: 16px;
+    }
+    .mixer-col {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .mixer-col label {
+      font-size: 0.7rem; opacity: 0.75; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .mixer-col input[type="range"] {
+      width: 100%; accent-color: #4ecca3;
+    }
+    .mixer-col .val {
+      font-size: 0.65rem; opacity: 0.55; font-family: monospace;
+    }
+
+    #modeRow {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 14px; flex-wrap: wrap; justify-content: center;
+    }
+    #modeLabel {
+      font-size: 0.8rem; opacity: 0.7; margin-right: 6px;
+      min-width: 80px; text-align: right;
+    }
+    .modeBtn {
+      padding: 6px 12px; font-size: 0.8rem; font-weight: 600;
+      background: #1a1a2e; color: #888;
+      border: 2px solid #333; border-radius: 6px;
+    }
+    .modeBtn.active { background: #e94560; color: #fff; border-color: #e94560; }
+
+    .controls {
+      display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;
+      justify-content: center;
+    }
+    #jumpBtn, #audioBtn, #autoBtn {
+      padding: 10px 24px; font-size: 1rem; font-weight: 600;
+      color: #1a1a2e; background: #e94560; border: none; border-radius: 8px;
+    }
+    #audioBtn.playing { background: #4ecca3; }
+    #autoBtn { background: #333; color: #aaa; }
+    #autoBtn.on { background: #4ecca3; color: #1a1a2e; }
+
     #status {
-      margin-top: 14px; font-size: 0.9rem; opacity: 0.7;
-      min-height: 1.2em; text-align: center; max-width: 360px;
+      margin-top: 12px; font-size: 0.85rem; opacity: 0.7;
+      text-align: center; min-height: 1.2em; max-width: 340px;
     }
     #diag {
-      margin-top: 10px; font-size: 0.7rem; opacity: 0.5;
-      text-align: center; max-width: 360px;
+      margin-top: 8px; font-size: 0.65rem; opacity: 0.4;
+      text-align: center; max-width: 340px;
       font-family: monospace; line-height: 1.5;
-    }
-    #stemPanel {
-      position: fixed; top: 16px; right: 16px;
-      display: flex; flex-direction: column; gap: 6px;
-      background: rgba(22,33,62,0.92); padding: 12px;
-      border-radius: 10px; border: 1px solid #0f3460; z-index: 10;
-    }
-    #stemPanel .title {
-      font-size: 0.7rem; text-transform: uppercase;
-      letter-spacing: 1px; opacity: 0.55; margin-bottom: 2px;
-      text-align: center;
-    }
-    .stemBtn {
-      padding: 7px 16px; font-size: 0.85rem; font-weight: 600;
-      background: #1a1a2e; color: #666;
-      border: 2px solid #333; border-radius: 6px;
-      cursor: pointer; text-align: left;
-      transition: all 0.15s; min-width: 130px;
-    }
-    .stemBtn.on { background: #4ecca3; color: #1a1a2e; border-color: #4ecca3; }
-    .stemBtn:active { transform: scale(0.97); }
-    @media (max-height: 640px) {
-      #stemPanel { top: 8px; right: 8px; padding: 8px; gap: 4px; }
-      .stemBtn { padding: 5px 12px; font-size: 0.8rem; min-width: 110px; }
     }
   </style>
 </head>
 <body>
-  <h1 style="margin:0 0 10px; font-size:1.4rem;">Game Music Demo — Racing</h1>
-  <p style="margin:0 0 20px; opacity:0.7;">4-stem mix · sample-accurate loop</p>
-
-  <div id="stemPanel">
-    <div class="title">Stems</div>
-    <button class="stemBtn on" data-stem="air">Air</button>
-    <button class="stemBtn on" data-stem="motion">Motion</button>
-    <button class="stemBtn on" data-stem="acceleration">Acceleration</button>
-    <button class="stemBtn on" data-stem="danger">Danger</button>
-  </div>
+  <h1 style="margin:0 0 4px; font-size:1.4rem;">Game Music Demo — Racing</h1>
+  <p style="margin:0; opacity:0.65; font-size:0.85rem;">Adaptive 4-stem mixer</p>
 
   <canvas id="c" width="320" height="240"></canvas>
+
+  <div id="mixer">
+    <div class="mixer-col">
+      <label>Air</label>
+      <input type="range" id="s-air" min="0" max="1" step="0.01" value="1">
+      <span class="val" id="v-air">1.00</span>
+    </div>
+    <div class="mixer-col">
+      <label>Motion</label>
+      <input type="range" id="s-motion" min="0" max="1" step="0.01" value="0">
+      <span class="val" id="v-motion">0.00</span>
+    </div>
+    <div class="mixer-col">
+      <label>Accel</label>
+      <input type="range" id="s-acceleration" min="0" max="1" step="0.01" value="0">
+      <span class="val" id="v-acceleration">0.00</span>
+    </div>
+    <div class="mixer-col">
+      <label>Danger</label>
+      <input type="range" id="s-danger" min="0" max="1" step="0.01" value="0">
+      <span class="val" id="v-danger">0.00</span>
+    </div>
+  </div>
+
+  <div id="modeRow">
+    <span id="modeLabel">1 Menu</span>
+    <button class="modeBtn active" data-mode="0">Menu</button>
+    <button class="modeBtn" data-mode="1">Cruise</button>
+    <button class="modeBtn" data-mode="2">Boost</button>
+    <button class="modeBtn" data-mode="3">Danger</button>
+  </div>
 
   <div class="controls">
     <button id="jumpBtn">Jump!</button>
     <button id="audioBtn" disabled>Loading…</button>
+    <button id="autoBtn" class="on">Auto</button>
   </div>
 
   <div id="status">Loading audio…</div>
   <div id="diag"></div>
 
   <script>
-    // ---------- Canvas + jump square (unchanged) ----------
+    // ---------- Canvas + jump square ----------
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
     let x = canvas.width / 2 - 15, y = canvas.height - 60, vy = 0, onGround = true;
@@ -104,76 +148,169 @@
     }
     (function loop() { update(); draw(); requestAnimationFrame(loop); })();
 
-    // ---------- Audio: sample-accurate loop from manifest ----------
+    // ---------- Adaptive mixer state ----------
     const STEMS = ['air', 'motion', 'acceleration', 'danger'];
-    const audioBtn = document.getElementById('audioBtn');
-    const statusEl = document.getElementById('status');
-    const diagEl = document.getElementById('diag');
-    const jumpBtn = document.getElementById('jumpBtn');
-    const stemButtons = document.querySelectorAll('.stemBtn');
 
-    const stemOn = { air: true, motion: true, acceleration: true, danger: true };
+    // Each mode is a snapshot of the 4 stem gains. Tuned by ear as a starting point.
+    // Order matters: this is the narrative arc over exactly one 8-bar section each.
+    const MODES = [
+      { name: '1 Menu',   gains: { air: 1.0, motion: 0.0, acceleration: 0.0, danger: 0.0 } },
+      { name: '2 Cruise', gains: { air: 0.8, motion: 1.0, acceleration: 0.3, danger: 0.1 } },
+      { name: '3 Boost',  gains: { air: 0.6, motion: 1.0, acceleration: 1.0, danger: 0.3 } },
+      { name: '4 Danger', gains: { air: 0.4, motion: 0.8, acceleration: 0.7, danger: 1.0 } },
+    ];
 
+    const BPM = 174;
+    const BARS_PER_MODE = 8;
+    const MODE_DUR_SEC = BARS_PER_MODE * 4 * 60 / BPM;   // 11.0345 s
+
+    let currentModeIndex = 0;
+    let autoNarrative = true;      // true = auto-advance; false = manual
+    let modeStartTime = 0;
+
+    // Persistent target gains (survive stop/start of audio)
+    const targetGains = { air: 1.0, motion: 0.0, acceleration: 0.0, danger: 0.0 };
+
+    // ---------- Audio state ----------
     let audioCtx = null, masterGain = null;
     let buffers = {}, sources = {}, gains = {};
     let isPlaying = false, isReady = false, manifest = null;
-    let loopDurationSec = null;   // exact, derived from loopSamples
+    let loopDurationSec = null;
+    const dragging = { air: false, motion: false, acceleration: false, danger: false };
+
+    const audioBtn = document.getElementById('audioBtn');
+    const autoBtn = document.getElementById('autoBtn');
+    const statusEl = document.getElementById('status');
+    const diagEl = document.getElementById('diag');
+    const jumpBtn = document.getElementById('jumpBtn');
+    const modeLabelEl = document.getElementById('modeLabel');
 
     jumpBtn.addEventListener('click', jump);
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); jump(); }
     });
 
-    stemButtons.forEach(btn => {
+    // ---------- Slider wiring ----------
+    STEMS.forEach(name => {
+      const slider = document.getElementById('s-' + name);
+      const valEl = document.getElementById('v-' + name);
+
+      slider.addEventListener('pointerdown', () => { dragging[name] = true; });
+      document.addEventListener('pointerup', () => { dragging[name] = false; });
+
+      slider.addEventListener('input', () => {
+        const v = parseFloat(slider.value);
+        valEl.textContent = v.toFixed(2);
+        // Drag = manual override: don't let auto narrative fight the user.
+        if (autoNarrative) {
+          autoNarrative = false;
+          updateAutoBtn();
+        }
+        setTargetGain(name, v, 0.05);
+      });
+
+      slider.value = targetGains[name];
+      valEl.textContent = targetGains[name].toFixed(2);
+    });
+
+    // ---------- Mode buttons ----------
+    document.querySelectorAll('.modeBtn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const name = btn.dataset.stem;
-        stemOn[name] = !stemOn[name];
-        btn.classList.toggle('on', stemOn[name]);
-        applyStemGain(name);
+        applyMode(parseInt(btn.dataset.mode, 10));
       });
     });
 
-    function applyStemGain(name) {
-      if (!audioCtx || !gains[name]) return;
-      const t = audioCtx.currentTime;
-      const g = gains[name].gain;
-      const target = stemOn[name] ? 1.0 : 0.0;
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(g.value, t);
-      g.linearRampToValueAtTime(target, t + 0.06);
+    autoBtn.addEventListener('click', () => {
+      autoNarrative = !autoNarrative;
+      updateAutoBtn();
+      if (autoNarrative) {
+        // Re-sync timer so the user gets a full mode duration from now,
+        // and re-apply the current mode's targets so the UI and audio agree.
+        modeStartTime = audioCtx ? audioCtx.currentTime : 0;
+        applyMode(currentModeIndex);
+      }
+    });
+
+    function updateAutoBtn() {
+      autoBtn.textContent = autoNarrative ? 'Auto' : 'Manual';
+      autoBtn.classList.toggle('on', autoNarrative);
     }
 
-    // Build a clean AudioBuffer of exactly `targetLength` samples,
-    // copying from `decoded` (which may be longer due to Opus padding).
+    // ---------- Gain targeting ----------
+    function setTargetGain(name, value, rampTime = 0.15) {
+      targetGains[name] = value;
+      if (gains[name]) {
+        const t = audioCtx.currentTime;
+        const g = gains[name].gain;
+        g.cancelScheduledValues(t);
+        g.setValueAtTime(g.value, t);
+        g.setTargetAtTime(value, t, rampTime);
+      }
+    }
+
+    function applyMode(modeIndex) {
+      currentModeIndex = modeIndex;
+      modeStartTime = audioCtx ? audioCtx.currentTime : 0;
+      const mode = MODES[modeIndex];
+      STEMS.forEach(name => setTargetGain(name, mode.gains[name], 0.15));
+      modeLabelEl.textContent = mode.name;
+      document.querySelectorAll('.modeBtn').forEach((b, i) => {
+        b.classList.toggle('active', i === modeIndex);
+      });
+    }
+
+    // ---------- Auto-narrative tick ----------
+    setInterval(() => {
+      if (!isPlaying || !autoNarrative || !audioCtx) return;
+      if (audioCtx.currentTime - modeStartTime >= MODE_DUR_SEC) {
+        applyMode((currentModeIndex + 1) % MODES.length);
+      }
+    }, 50);
+
+    // ---------- UI feedback loop ----------
+    function uiTick() {
+      STEMS.forEach(name => {
+        if (dragging[name]) return;  // don't fight the user's finger
+        const slider = document.getElementById('s-' + name);
+        const valEl = document.getElementById('v-' + name);
+        let v;
+        if (isPlaying && gains[name]) {
+          v = gains[name].gain.value;
+        } else {
+          v = targetGains[name];
+        }
+        if (Math.abs(parseFloat(slider.value) - v) > 0.004) {
+          slider.value = v;
+          valEl.textContent = v.toFixed(2);
+        }
+      });
+      requestAnimationFrame(uiTick);
+    }
+    uiTick();
+
+    // ---------- Audio loading (sample-accurate) ----------
     function makeCleanBuffer(decoded, targetLength) {
       const clean = audioCtx.createBuffer(
-        decoded.numberOfChannels,
-        targetLength,
-        audioCtx.sampleRate
+        decoded.numberOfChannels, targetLength, audioCtx.sampleRate
       );
       for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
         const src = decoded.getChannelData(ch);
         const dst = clean.getChannelData(ch);
-        const n = Math.min(src.length, targetLength);
-        dst.set(src.subarray(0, n));
-        // remaining samples stay 0 (only happens if decoded is shorter than expected)
+        dst.set(src.subarray(0, Math.min(src.length, targetLength)));
       }
       return clean;
     }
 
     async function loadAll() {
       try {
-        // 1) Manifest (required for sample-accurate loop)
         const mres = await fetch('racing_manifest.json', { cache: 'no-cache' });
         if (!mres.ok) throw new Error('manifest HTTP ' + mres.status);
         manifest = await mres.json();
 
-        // 2) AudioContext locked to source sample rate (no resampling)
         const Ctx = window.AudioContext || window.webkitAudioContext;
         try {
           audioCtx = new Ctx({ sampleRate: manifest.sampleRate });
         } catch (e) {
-          // Older browsers may not accept options
           audioCtx = new Ctx();
         }
 
@@ -181,35 +318,29 @@
         masterGain.gain.value = 0.7;
         masterGain.connect(audioCtx.destination);
 
-        // 3) Load + decode + clean all 4 stems in parallel
         const expectedLen = Math.round(
           manifest.loopSamples * audioCtx.sampleRate / manifest.sampleRate
         );
-
-        const diagLines = [`ctx=${audioCtx.sampleRate}Hz  expected=${expectedLen}`];
+        const diagLines = [`ctx=${audioCtx.sampleRate}Hz expected=${expectedLen}`];
 
         await Promise.all(STEMS.map(async (name) => {
           const res = await fetch(`racing_${name}_loop.opus`, { cache: 'no-cache' });
           if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
           const ab = await res.arrayBuffer();
           const decoded = await audioCtx.decodeAudioData(ab);
-
-          const clean = makeCleanBuffer(decoded, expectedLen);
-          buffers[name] = clean;
-
-          const diff = decoded.length - expectedLen;
-          diagLines.push(
-            `${name}: dec=${decoded.length} d=${diff >= 0 ? '+' : ''}${diff}`
-          );
+          buffers[name] = makeCleanBuffer(decoded, expectedLen);
+          const d = decoded.length - expectedLen;
+          diagLines.push(`${name}: dec=${decoded.length} d=${d >= 0 ? '+' : ''}${d}`);
         }));
 
         loopDurationSec = expectedLen / audioCtx.sampleRate;
-
         diagEl.innerHTML = diagLines.join('<br>');
 
-        const bpm = manifest.bpm ?? '?';
+        // Apply initial mode (updates targetGains + UI)
+        applyMode(0);
+
         statusEl.textContent =
-          `Ready: ${bpm} BPM, ${loopDurationSec.toFixed(6)} s, ${STEMS.length} stems`;
+          `Ready: ${manifest.bpm} BPM, ${loopDurationSec.toFixed(6)} s, mode ${MODES[0].name}`;
         isReady = true;
         audioBtn.disabled = false;
         audioBtn.textContent = 'Start';
@@ -224,7 +355,6 @@
       if (!isReady || isPlaying) return;
       if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-      // One shared start time -> sample-accurate sync between stems.
       const startAt = audioCtx.currentTime + 0.08;
 
       STEMS.forEach(name => {
@@ -232,9 +362,9 @@
         src.buffer = buffers[name];
         src.loop = true;
         src.loopStart = 0;
-        src.loopEnd = loopDurationSec;   // exact length, no padding included
+        src.loopEnd = loopDurationSec;
         const g = audioCtx.createGain();
-        g.gain.value = stemOn[name] ? 1.0 : 0.0;
+        g.gain.value = targetGains[name];   // use current target, not hardcoded
         src.connect(g).connect(masterGain);
         src.start(startAt);
         sources[name] = src;
@@ -242,9 +372,11 @@
       });
 
       isPlaying = true;
+      modeStartTime = audioCtx.currentTime;
       audioBtn.textContent = 'Stop';
       audioBtn.classList.add('playing');
-      statusEl.textContent = 'Playing (sample-accurate loop)';
+      statusEl.textContent = `Playing — mode ${MODES[currentModeIndex].name}`
+        + (autoNarrative ? ' (auto)' : ' (manual)');
     }
 
     function stopPlayback() {
