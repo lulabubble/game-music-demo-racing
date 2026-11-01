@@ -110,6 +110,7 @@ from sfx_functional_mono_noise_wind_contract import (
     aggressive as wind_aggressive,
     extreme as wind_extreme,
 )
+from math_render_smooth_quantized_contract import smooth_quantized
 
 # =====================================================================
 # GLOBAL CONFIG
@@ -288,13 +289,8 @@ def section_of_bar(bar):
 
 def render_wind_exp_2x():
     raw = np.random.RandomState(SEED + 200).uniform(-1, 1, LOOP_LEN)
-    smooth_L = np.convolve(raw, np.ones(81) / 81,   mode='same')
-    smooth_R = np.convolve(raw, np.ones(128) / 128, mode='same')
-    smooth_L = smooth_L / (np.max(np.abs(smooth_L)) + 1e-9) * WIND_EXP_SMOOTH_SCALE
-    smooth_R = smooth_R / (np.max(np.abs(smooth_R)) + 1e-9) * WIND_EXP_SMOOTH_SCALE
-    Q = WIND_EXP_QUANT_STEPS
-    smooth_L = np.round(smooth_L * Q) / Q
-    smooth_R = np.round(smooth_R * Q) / Q
+    smooth_L = smooth_quantized(raw, 81,  WIND_EXP_SMOOTH_SCALE, WIND_EXP_QUANT_STEPS)
+    smooth_R = smooth_quantized(raw, 128, WIND_EXP_SMOOTH_SCALE, WIND_EXP_QUANT_STEPS)
     b, a = signal.butter(2, [200 / (SR / 2), 3000 / (SR / 2)], btype='band')
     smooth_L = signal.lfilter(b, a, smooth_L)
     smooth_R = signal.lfilter(b, a, smooth_R)
