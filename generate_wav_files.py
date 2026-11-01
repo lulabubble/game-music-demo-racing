@@ -105,6 +105,11 @@ from instruments_render_mono_contract import (
     kick, snare, snare_short, hat, open_hat, riser,
     reese, sub_long, arp_pulse, pad_note,
 )
+from sfx_functional_mono_noise_wind_contract import (
+    soft as wind_soft,
+    aggressive as wind_aggressive,
+    extreme as wind_extreme,
+)
 
 # =====================================================================
 # GLOBAL CONFIG
@@ -264,9 +269,9 @@ def section_of(bar):
 # =====================================================================
 # EXPERIMENTAL WIND (unchanged from v8)
 # =====================================================================
-def char_H(x):   return np.tanh(x * 2.0) * 0.7
-def char_D(x):   return x ** 3 * CHAR_D_EXPONENT
-def char_G(x):   return np.arctanh(np.clip(x, -0.999, 0.999)) * 0.40
+def char_H(x):   return wind_soft(x)
+def char_D(x):   return wind_aggressive(x, exponent=CHAR_D_EXPONENT)
+def char_G(x):   return wind_extreme(x)
 
 WIND_CHARACTER = {
     'intro':      char_H,
