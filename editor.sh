@@ -5,5 +5,8 @@ dir=`pwd | sed "s,^$home_regex/,,"`
 
 rsync -rltv --delete --delete-excluded \
       --exclude='.git/' \
+      --exclude='__pycache__/' \
+      --exclude='*.pyc' \
       --exclude='*.opus' \
       ~/$dir/ /sdcard/mycode/$dir
+
