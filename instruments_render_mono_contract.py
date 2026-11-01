@@ -4,7 +4,9 @@ Import these, do not reimplement.
 
 Return: MONO np.ndarray, float64, 1-D.
 shape=(int(round(dur*SR)),), SR = render rate.
-Values ~[-amp, +amp], not clipped, self-enveloped.
+Peak abs <= amp for tonal (kick, reese, sub_long, arp_pulse, pad_note);
+up to ~3*amp for noise-based (snare, snare_short, hat, open_hat, riser).
+Not clipped, self-enveloped.
 Mono only; stereo lives in composer.
 Uses np.random (global): seed before call.
   [rng] = uses np.random, needs seed.
