@@ -117,93 +117,27 @@ from engine import (
     make_ir_stereo, apply_reverb, sidechain_duck,
 )
 
-# =====================================================================
-# GLOBAL CONFIG
-# =====================================================================
-SR                = 44100
-BPM               = 174.0
-BEAT              = 60.0 / BPM
-BAR               = BEAT * 4.0
-BARS              = 32
-SEED              = 11
-LOOP_LEN          = int(round(BARS * BAR * SR))
-BUFFER_LEN        = 2 * LOOP_LEN
-OUT_PREFIX        = 'racing'
-
-# Loudness / peak policy
-TARGET_RMS_DB     = -18.0
-TARGET_PEAK       = 0.92
-MASTER_PEAK_LIMIT = 0.98
-
-# --- [CHANGE-3] Context double balance (new in v9) ---
-# target stem x DOUBLE_CONTEXT_BOOST, each other stem x DOUBLE_CONTEXT_OTHERS.
-# 3.0 / 0.33 = 9.09x amplitude ≈ +19.2 dB relative to each other stem.
-# Absolute level renormalized to TARGET_RMS_DB per target.
-DOUBLE_CONTEXT_BOOST  = 3.00
-DOUBLE_CONTEXT_OTHERS = 0.33
-
-# --- [FIX-1] Kick fade-out (unchanged) ---
-KICK_FADE_OUT_SEC = 0.030
-
-# --- wind_exp tuning constants (unchanged) ---
-WIND_EXP_SMOOTH_SCALE = 0.05
-WIND_EXP_FINAL_SCALE  = 0.028 * 2
-WIND_EXP_QUANT_STEPS  = 64
-CHAR_D_EXPONENT       = 1.5
+from track_first_demo.config import (
+    BPM, BARS, SEED, OUT_PREFIX,
+    TARGET_RMS_DB, TARGET_PEAK, MASTER_PEAK_LIMIT,
+    DOUBLE_CONTEXT_BOOST, DOUBLE_CONTEXT_OTHERS,
+    KICK_FADE_OUT_SEC,
+    WIND_EXP_SMOOTH_SCALE, WIND_EXP_FINAL_SCALE, WIND_EXP_QUANT_STEPS,
+    CHAR_D_EXPONENT,
+    PRESETS, ACTIVE_PRESET,
+    REVERB_CFG,
+    BUS_TO_STEM, BUS_ORDER, STEM_ORDER,
+    CHORDS, PROG,
+)
 
 # =====================================================================
-# PRESETS - named so manifest records which values were used
+# PROJECT-WIDE + DERIVED FROM CONFIG
 # =====================================================================
-PRESETS = {
-    'production': {
-        'pad':      0.50,
-        'wind':     0.20,
-        'wind_exp': 0.70,
-        'kick':     0.85,
-        'hat':      0.45,
-        'snare':    0.65,
-        'fx':       0.45,
-        'reese':    0.80,
-        'sub':      0.75,
-        'arp':      0.55,
-    },
-}
-ACTIVE_PRESET = 'production'
-
-# =====================================================================
-# REVERB CONFIG (unchanged from v8)
-# =====================================================================
-REVERB_CFG = {
-    'pad':      {'ir_dur': 4.00, 'wet': 0.50, 'decay': 1.4, 'hp': 250,  'lp': 4000, 'seed': 1001, 'ch': 'mono'},
-    'wind':     {'ir_dur': 2.00, 'wet': 0.25, 'decay': 2.0, 'hp': 400,  'lp': 3000, 'seed': 1002, 'ch': 'mono'},
-    'wind_exp': {'ir_dur': 2.00, 'wet': 0.25, 'decay': 2.0, 'hp': 400,  'lp': 3000, 'seed': 1003, 'ch': 'stereo'},
-    'kick':     {'ir_dur': 0.15, 'wet': 0.04, 'decay': 4.0, 'hp': 300,  'lp': 2500, 'seed': 1004, 'ch': 'mono'},
-    'hat':      {'ir_dur': 0.25, 'wet': 0.12, 'decay': 3.0, 'hp': 1500, 'lp': 8000, 'seed': 1005, 'ch': 'mono'},
-    'snare':    {'ir_dur': 0.20, 'wet': 0.08, 'decay': 3.5, 'hp': 500,  'lp': 6000, 'seed': 1006, 'ch': 'mono'},
-    'fx':       {'ir_dur': 3.00, 'wet': 0.45, 'decay': 1.4, 'hp': 200,  'lp': 4000, 'seed': 1007, 'ch': 'mono'},
-    'reese':    {'ir_dur': 0.10, 'wet': 0.02, 'decay': 5.0, 'hp': 300,  'lp': 4000, 'seed': 1008, 'ch': 'mono'},
-    'sub':      {'ir_dur': 0.00, 'wet': 0.00, 'decay': 1.0, 'hp': 100,  'lp': 1000, 'seed': 1009, 'ch': 'mono'},
-    'arp':      {'ir_dur': 0.20, 'wet': 0.08, 'decay': 3.5, 'hp': 500,  'lp': 6000, 'seed': 1010, 'ch': 'mono'},
-}
-
-# =====================================================================
-# BUS -> STEM MAPPING (unchanged)
-# =====================================================================
-BUS_TO_STEM = {
-    'pad':      'air',
-    'wind':     'air',
-    'wind_exp': 'danger',
-    'kick':     'motion',
-    'hat':      'motion',
-    'snare':    'danger',
-    'fx':       'danger',
-    'reese':    'acceleration',
-    'sub':      'acceleration',
-    'arp':      'acceleration',
-}
-
-BUS_ORDER  = ['pad', 'wind', 'wind_exp', 'kick', 'hat', 'snare', 'fx', 'reese', 'sub', 'arp']
-STEM_ORDER = ['air', 'motion', 'acceleration', 'danger']
+SR         = 44100
+BEAT       = 60.0 / BPM
+BAR        = BEAT * 4.0
+LOOP_LEN   = int(round(BARS * BAR * SR))
+BUFFER_LEN = 2 * LOOP_LEN
 
 OUT_CANDIDATES = [
     '/storage/emulated/0/Download',
@@ -231,16 +165,6 @@ def place_at_bar(buf, hit, bar, offset_16ths=0.0):
     i = iteration * LOOP_LEN + int(round(rel_t * SR))
     place_at_sample(buf, hit, i)
 
-# =====================================================================
-# HARMONY (unchanged)
-# =====================================================================
-CHORDS = {
-    'Dm': {'root': 38, 'tones': [62, 65, 69]},
-    'Bb': {'root': 34, 'tones': [58, 62, 65]},
-    'F':  {'root': 41, 'tones': [65, 69, 72]},
-    'C':  {'root': 36, 'tones': [60, 64, 67]},
-}
-PROG = ['Dm', 'Bb', 'F', 'C']
 
 def chord_at(bar):
     return PROG[bar % 4]
