@@ -112,6 +112,11 @@ from sfx_functional_mono_noise_wind_contract import (
 )
 from math_render_smooth_quantized_contract import smooth_quantized
 
+from engine import (
+    peak_of, rms_db_of, solve_soft_limit_a, make_loop,
+    make_ir_stereo, apply_reverb, sidechain_duck,
+)
+
 # =====================================================================
 # GLOBAL CONFIG
 # =====================================================================
@@ -225,27 +230,6 @@ def place_at_bar(buf, hit, bar, offset_16ths=0.0):
     rel_t = rel_bar * BAR + offset_16ths * BEAT * 0.25
     i = iteration * LOOP_LEN + int(round(rel_t * SR))
     place_at_sample(buf, hit, i)
-
-def solve_soft_limit_a(peak_x, target_peak, iters=100):
-    if peak_x <= target_peak:
-        return None
-    ratio = target_peak / peak_x
-    lo, hi = 1e-9, 100.0
-    for _ in range(iters):
-        mid = 0.5 * (lo + hi)
-        if np.tanh(mid) / mid > ratio:
-            lo = mid
-        else:
-            hi = mid
-    u = 0.5 * (lo + hi)
-    return peak_x / u
-
-def peak_of(x):
-    return float(np.max(np.abs(x)))
-
-def rms_db_of(x):
-    rms = float(np.sqrt(np.mean(x.astype(np.float64) ** 2)))
-    return 20.0 * np.log10(rms + 1e-12)
 
 # =====================================================================
 # HARMONY (unchanged)
@@ -450,80 +434,17 @@ def render_2x():
                 for pos in [0, 8]:
                     place_at_bar(kick_bus, kick(amp=0.7), bar, pos)
 
-    def sidechain_duck(target, trigger, amount, release=0.04):
-        trig = np.abs(trigger)
-        kl = int(release * SR)
-        if kl < 2:
-            return target
-        kernel = np.exp(-np.arange(kl) / (kl / 3))
-        kernel /= kernel.sum()
-        trig = np.convolve(trig, kernel, mode='same')
-        peak = trig.max()
-        if peak > 1e-9:
-            trig /= peak
-        return target * (1 - amount * trig)
-
-    sub_bus   = sidechain_duck(sub_bus,   kick_bus, 0.35)
-    reese_bus = sidechain_duck(reese_bus, kick_bus, 0.30)
-    pad_bus   = sidechain_duck(pad_bus,   kick_bus, 0.20)
-    arp_bus   = sidechain_duck(arp_bus,   kick_bus, 0.15)
-    wind      = sidechain_duck(wind,      kick_bus, 0.10)
+    sub_bus   = sidechain_duck(sub_bus,   kick_bus, 0.35, SR)
+    reese_bus = sidechain_duck(reese_bus, kick_bus, 0.30, SR)
+    pad_bus   = sidechain_duck(pad_bus,   kick_bus, 0.20, SR)
+    arp_bus   = sidechain_duck(arp_bus,   kick_bus, 0.15, SR)
+    wind      = sidechain_duck(wind,      kick_bus, 0.10, SR)
 
     return {
         'pad': pad_bus, 'wind': wind, 'wind_exp': wind_exp,
         'kick': kick_bus, 'hat': hat_bus, 'snare': snare_bus,
         'fx': fx_bus, 'reese': reese_bus, 'sub': sub_bus, 'arp': arp_bus,
     }
-
-# =====================================================================
-# REVERB (unchanged from v8)
-# =====================================================================
-def make_ir_stereo(dur, decay, hp, lp, seed):
-    n = max(2, int(dur * SR))
-    t = np.arange(n) / SR
-    rng = np.random.RandomState(seed)
-    ir_L = rng.randn(n) * np.exp(-t * decay)
-    ir_R = rng.randn(n) * np.exp(-t * decay)
-    b, a = signal.butter(2, hp / (SR / 2), btype='high')
-    ir_L = signal.lfilter(b, a, ir_L); ir_R = signal.lfilter(b, a, ir_R)
-    b, a = signal.butter(2, lp / (SR / 2), btype='low')
-    ir_L = signal.lfilter(b, a, ir_L); ir_R = signal.lfilter(b, a, ir_R)
-    ir_L[0] = 0.0; ir_R[0] = 0.0
-    ir_L /= (np.sqrt(np.sum(ir_L ** 2)) + 1e-9)
-    ir_R /= (np.sqrt(np.sum(ir_R ** 2)) + 1e-9)
-    return ir_L, ir_R
-
-
-def apply_reverb(dry, ir_L, ir_R, wet):
-    if wet <= 0.0:
-        if dry.ndim == 1:
-            return np.stack([dry, dry], axis=-1).astype(np.float32)
-        return dry.astype(np.float32, copy=True)
-
-    if dry.ndim == 1:
-        N = len(dry)
-        wet_L = signal.fftconvolve(dry, ir_L, mode='full')[:N]
-        wet_R = signal.fftconvolve(dry, ir_R, mode='full')[:N]
-        out_L = (1.0 - wet) * dry + wet * wet_L
-        out_R = (1.0 - wet) * dry + wet * wet_R
-        return np.stack([out_L, out_R], axis=-1).astype(np.float32)
-    else:
-        N = dry.shape[0]
-        L = dry[:, 0]; R = dry[:, 1]
-        wet_L = signal.fftconvolve(L, ir_L, mode='full')[:N]
-        wet_R = signal.fftconvolve(R, ir_R, mode='full')[:N]
-        out_L = (1.0 - wet) * L + wet * wet_L
-        out_R = (1.0 - wet) * R + wet * wet_R
-        return np.stack([out_L, out_R], axis=-1).astype(np.float32)
-
-
-def make_loop(buf_2N):
-    A = buf_2N[:LOOP_LEN]
-    B = buf_2N[LOOP_LEN:LOOP_LEN * 2]
-    x = np.linspace(0, 1, LOOP_LEN)
-    if buf_2N.ndim == 2:
-        x = x[:, None]
-    return B * (1 - x) + A * x
 
 
 # =====================================================================
@@ -612,7 +533,7 @@ def main():
     wet_buses = {}
     for b in BUS_ORDER:
         cfg = REVERB_CFG[b]
-        ir_L, ir_R = make_ir_stereo(cfg['ir_dur'], cfg['decay'], cfg['hp'], cfg['lp'], cfg['seed'])
+        ir_L, ir_R = make_ir_stereo(cfg['ir_dur'], cfg['decay'], cfg['hp'], cfg['lp'], cfg['seed'], SR)
         dry = buses[b]
         wet = apply_reverb(dry, ir_L, ir_R, cfg['wet'])
         wet_buses[b] = wet
@@ -688,7 +609,7 @@ def main():
     print(f"  {'stem':13s} {'max|loop-A|':>12s} {'max|loop-B|':>12s} {'check':>6s}")
     for name in STEM_ORDER:
         buf = stems_wet[name]
-        loop = make_loop(buf)
+        loop = make_loop(buf, LOOP_LEN)
         loops[name] = loop
         A = buf[:LOOP_LEN]
         B = buf[LOOP_LEN:LOOP_LEN * 2]
